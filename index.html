@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TimeCard">
+<meta name="theme-color" content="#0d0d0d">
+<title>TimeCard</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0d0d0d; --surface:#1c1c1c; --surface2:#252525; --surface3:#303030;
+  --border:#2e2e2e; --border2:#3a3a3a; --text:#f2f2f2; --muted:#888;
+  --faint:#484848; --accent:#d4ff4e; --accent-rgb:212,255,78;
+  --red:#ff5252; --orange:#ffaa44; --radius:14px; --radius-sm:9px;
+  --mono:'Space Mono',monospace; --sans:'DM Sans',sans-serif;
+}
+.light {
+  --bg:#f0efeb; --surface:#fff; --surface2:#e8e8e3; --surface3:#ddddd7;
+  --border:#d5d5ce; --border2:#c8c8c0; --text:#111; --muted:#666;
+  --faint:#bbb; --accent:#111; --accent-rgb:17,17,17;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;font-family:var(--sans);background:var(--bg);color:var(--text);}
+body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 18px 10px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.logo{font-family:var(--mono);font-size:16px;font-weight:700;letter-spacing:1px;color:var(--accent);}
+.logo em{color:var(--muted);font-style:normal;font-weight:400;}
+.top-btns{display:flex;gap:8px;}
+.ib{width:34px;height:34px;border-radius:var(--radius-sm);background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);font-size:14px;}
+.nav{display:flex;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;}
+.nt{flex:1;padding:10px 4px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);cursor:pointer;border-bottom:2px solid transparent;transition:all .14s;}
+.nt.on{color:var(--accent);border-bottom-color:var(--accent);}
+.pages{flex:1;overflow:hidden;position:relative;}
+.page{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px;display:none;flex-direction:column;gap:11px;}
+.page.on{display:flex;}
+
+/* HERO */
+.hero{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:15px;display:flex;flex-direction:column;gap:11px;position:relative;}
+.hero.clocked{border-color:rgba(var(--accent-rgb),.4);}
+.hero-glow{position:absolute;top:-1px;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,var(--accent),transparent);border-radius:var(--radius) var(--radius) 0 0;opacity:0;transition:opacity .3s;}
+.hero.clocked .hero-glow{opacity:1;}
+.clock-btn{width:100%;padding:17px 20px;border-radius:12px;border:2px solid var(--accent);background:rgba(var(--accent-rgb),.07);display:flex;align-items:center;justify-content:center;gap:12px;cursor:pointer;transition:background .15s;}
+.clock-btn:active{background:rgba(var(--accent-rgb),.2);}
+.clock-btn.out{border-color:var(--red);background:rgba(255,82,82,.07);}
+.clock-btn.out:active{background:rgba(255,82,82,.2);}
+.cb-icon{font-size:20px;pointer-events:none;}
+.cb-label{font-family:var(--mono);font-size:15px;font-weight:700;letter-spacing:.1em;color:var(--accent);text-transform:uppercase;pointer-events:none;}
+.clock-btn.out .cb-label{color:var(--red);}
+.elapsed-row{display:none;align-items:center;justify-content:space-between;}
+.hero.clocked .elapsed-row{display:flex;}
+.elapsed{font-family:var(--mono);font-size:28px;font-weight:700;color:var(--accent);letter-spacing:-1px;}
+.since-pill{display:flex;align-items:center;gap:6px;background:rgba(var(--accent-rgb),.07);border:1px solid rgba(var(--accent-rgb),.2);border-radius:30px;padding:5px 11px;font-size:11px;color:var(--muted);}
+.pulse{width:7px;height:7px;border-radius:50%;background:var(--accent);flex-shrink:0;animation:pulse 1.4s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(.6)}}
+
+/* DAY SUMMARY BAR */
+.day-bar{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:13px 15px;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.day-bar-left{display:flex;flex-direction:column;gap:2px;}
+.day-bar-label{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);}
+.day-bar-hours{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--accent);}
+.day-bar-right{display:flex;gap:10px;}
+.day-stat{text-align:center;}
+.day-stat-val{font-family:var(--mono);font-size:14px;font-weight:700;}
+.day-stat-lbl{font-size:9px;color:var(--faint);text-transform:uppercase;letter-spacing:.08em;}
+.overtime{color:var(--orange)!important;}
+
+/* CARD */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:15px;}
+.card-label{font-size:10px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);margin-bottom:9px;display:block;}
+.tag-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:11px;}
+.chip{padding:5px 12px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid var(--border);background:var(--surface2);cursor:pointer;transition:all .12s;}
+textarea,input[type=text],input[type=time],input[type=date]{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--sans);font-size:14px;padding:10px 12px;outline:none;-webkit-appearance:none;transition:border-color .15s;}
+textarea:focus,input:focus{border-color:var(--accent);}
+textarea{resize:none;min-height:72px;}
+textarea::placeholder,input::placeholder{color:var(--faint);}
+
+/* SECTION */
+.sec-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.sec-title{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);}
+.sec-total{font-family:var(--mono);font-size:12px;color:var(--accent);}
+
+/* ENTRY CARD */
+.ec{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;position:relative;overflow:hidden;}
+.ec::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--ec-color,var(--accent));}
+.ec-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px;}
+.ec-time{font-family:var(--mono);font-size:12px;font-weight:700;}
+.ec-dur{font-family:var(--mono);font-size:12px;color:var(--accent);white-space:nowrap;}
+.ec-tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;margin-bottom:4px;}
+.ec-note{font-size:12px;color:var(--muted);line-height:1.5;}
+.ec-actions{display:flex;gap:6px;margin-top:9px;border-top:1px solid var(--border);padding-top:9px;}
+.ec-btn{flex:1;padding:6px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;text-align:center;}
+.ec-btn.danger{color:var(--red);border-color:rgba(255,82,82,.25);}
+.add-manual-btn{width:100%;padding:11px;background:var(--surface);border:1px dashed var(--border2);border-radius:var(--radius);color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;}
+
+/* DAY GROUP */
+.day-group-hdr{display:flex;justify-content:space-between;align-items:center;padding:6px 3px 3px;font-size:11px;font-weight:600;color:var(--faint);text-transform:uppercase;letter-spacing:.07em;}
+.day-group-hdr span{font-family:var(--mono);color:var(--accent);font-size:11px;}
+.entries-list{display:flex;flex-direction:column;gap:7px;}
+
+/* STATS */
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;}
+.stat-card.full{grid-column:span 2;}
+.stat-label{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin-bottom:4px;}
+.stat-value{font-family:var(--mono);font-size:26px;font-weight:700;}
+.stat-value.accent{color:var(--accent);}
+.stat-value.warn{color:var(--orange);}
+.stat-sub{font-size:11px;color:var(--muted);margin-top:3px;}
+.bar-row{display:flex;align-items:center;gap:9px;margin-bottom:6px;}
+.bar-day{font-size:10px;font-family:var(--mono);color:var(--muted);width:24px;text-align:right;flex-shrink:0;}
+.bar-track{flex:1;height:18px;background:var(--surface2);border-radius:4px;overflow:hidden;position:relative;}
+.bar-fill{height:100%;background:var(--accent);border-radius:4px;display:flex;align-items:center;padding-left:6px;min-width:0;transition:width .4s;}
+.bar-fill.over{background:var(--orange);}
+.bar-val{font-family:var(--mono);font-size:9px;color:#111;font-weight:700;white-space:nowrap;}
+.cat-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);}
+.cat-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.cat-name{flex:1;font-size:13px;}
+.cat-hrs{font-family:var(--mono);font-size:12px;color:var(--muted);}
+
+/* SETTINGS / MANAGE */
+.action-btn{width:100%;padding:13px 15px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-size:14px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:12px;text-align:left;}
+.action-btn.danger{color:var(--red);}
+.action-btn-icon{font-size:18px;flex-shrink:0;}
+.action-btn-text{flex:1;}
+.action-btn-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+.cat-manage-row{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--border);}
+.cat-swatch{width:30px;height:30px;border-radius:8px;flex-shrink:0;cursor:pointer;border:2px solid transparent;}
+.cat-manage-name{flex:1;font-size:14px;font-weight:500;}
+.cat-del{color:var(--red);font-size:17px;cursor:pointer;padding:4px 8px;}
+.add-cat-row{display:flex;gap:8px;align-items:center;margin-top:12px;}
+.color-swatch{width:40px;height:40px;border-radius:var(--radius-sm);border:1px solid var(--border);overflow:hidden;flex-shrink:0;}
+.color-swatch input[type=color]{width:130%;height:130%;margin:-15%;border:none;cursor:pointer;padding:0;}
+.export-btn{width:100%;padding:14px;background:var(--accent);color:#111;border:none;border-radius:var(--radius-sm);font-family:var(--mono);font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.05em;}
+.light .export-btn{background:#111;color:#f5f5f5;}
+.light .add-cat-btn{background:#111;color:#f5f5f5;}
+
+/* MODAL */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;display:flex;align-items:flex-end;padding:14px;opacity:0;pointer-events:none;transition:opacity .2s;}
+.overlay.on{opacity:1;pointer-events:all;}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);padding:18px;width:100%;transform:translateY(20px);transition:transform .2s;max-height:85vh;overflow-y:auto;}
+.overlay.on .modal{transform:translateY(0);}
+.modal-title{font-size:15px;font-weight:700;margin-bottom:14px;padding-bottom:11px;border-bottom:1px solid var(--border);}
+.field{margin-bottom:11px;}
+.field-label{display:block;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin-bottom:5px;}
+.modal-actions{display:flex;gap:8px;margin-top:14px;}
+.btn-save{flex:1;padding:12px;background:var(--accent);color:#111;border:none;border-radius:var(--radius-sm);font-family:var(--mono);font-size:13px;font-weight:700;cursor:pointer;}
+.light .btn-save{background:#111;color:#f5f5f5;}
+.btn-cancel{flex:1;padding:12px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;}
+
+/* TOAST */
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(12px);background:var(--surface3);border:1px solid var(--border2);border-radius:30px;padding:8px 16px;font-size:13px;font-weight:500;color:var(--text);z-index:200;opacity:0;transition:all .22s;white-space:nowrap;pointer-events:none;}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0);}
+.empty-state{text-align:center;padding:32px 16px;color:var(--faint);}
+.empty-icon{font-size:30px;margin-bottom:8px;}
+.empty-text{font-size:13px;}
+::-webkit-scrollbar{width:0;}
+.add-cat-btn{padding:10px 14px;background:var(--accent);color:#111;border:none;border-radius:var(--radius-sm);font-family:var(--mono);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;}
+</style>
+</head>
+<body>
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="logo">TIME<em>CARD</em></div>
+  <div class="top-btns">
+    <div class="ib" id="themeBtn" title="Toggle theme">☀</div>
+  </div>
+</div>
+
+<!-- NAV -->
+<div class="nav">
+  <div class="nt on" data-tab="clock">⏱ Clock</div>
+  <div class="nt" data-tab="log">📋 Log</div>
+  <div class="nt" data-tab="stats">📊 Stats</div>
+  <div class="nt" data-tab="settings">⚙️ More</div>
+</div>
+
+<!-- PAGES -->
+<div class="pages">
+
+  <!-- CLOCK TAB -->
+  <div class="page on" id="page-clock">
+    <div class="hero" id="hero">
+      <div class="hero-glow"></div>
+      <div class="clock-btn" id="clockBtn">
+        <div class="cb-icon" id="cbIcon">▶</div>
+        <div class="cb-label" id="cbLabel">Clock In</div>
+      </div>
+      <div class="elapsed-row">
+        <div class="elapsed" id="elapsedDisplay">00:00:00</div>
+        <div class="since-pill"><div class="pulse"></div><span id="sinceText">—</span></div>
+      </div>
+    </div>
+
+    <div class="day-bar" id="dayBar">
+      <div class="day-bar-left">
+        <div class="day-bar-label">Today</div>
+        <div class="day-bar-hours" id="dayHours">0h</div>
+      </div>
+      <div class="day-bar-right">
+        <div class="day-stat">
+          <div class="day-stat-val" id="dayEntries">0</div>
+          <div class="day-stat-lbl">Entries</div>
+        </div>
+        <div class="day-stat">
+          <div class="day-stat-val" id="weekHoursSmall">0h</div>
+          <div class="day-stat-lbl">This Week</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <span class="card-label">Category</span>
+      <div class="tag-row" id="clockTagRow"></div>
+      <span class="card-label">Note</span>
+      <textarea id="noteInput" placeholder="What are you working on?…" rows="2"></textarea>
+    </div>
+
+    <div>
+      <div class="sec-hdr">
+        <div class="sec-title">Today's Entries</div>
+        <div class="sec-total" id="todayTotal"></div>
+      </div>
+      <div class="entries-list" id="todayList"></div>
+    </div>
+    <div class="add-manual-btn" id="addManualBtn">＋ Add Manual Entry</div>
+  </div>
+
+  <!-- LOG TAB -->
+  <div class="page" id="page-log">
+    <div class="sec-hdr">
+      <div class="sec-title">All Entries</div>
+      <div class="sec-total" id="logTotal"></div>
+    </div>
+    <div id="logList"></div>
+  </div>
+
+  <!-- STATS TAB -->
+  <div class="page" id="page-stats">
+    <div class="stat-grid" id="statGrid"></div>
+    <div>
+      <div class="sec-title" style="margin-bottom:10px">This Week</div>
+      <div class="card" id="weekChart"></div>
+    </div>
+    <div>
+      <div class="sec-title" style="margin-bottom:10px">By Category</div>
+      <div class="card" id="catBreakdown" style="padding:0 15px"></div>
+    </div>
+  </div>
+
+  <!-- SETTINGS TAB -->
+  <div class="page" id="page-settings">
+    <!-- Export / Backup -->
+    <div class="sec-title" style="margin-bottom:8px">Data</div>
+    <div class="action-btn" id="exportCsvBtn">
+      <div class="action-btn-icon">📥</div>
+      <div class="action-btn-text">
+        Export CSV
+        <div class="action-btn-sub">Save all entries as a spreadsheet</div>
+      </div>
+    </div>
+    <div class="action-btn" id="backupBtn">
+      <div class="action-btn-icon">💾</div>
+      <div class="action-btn-text">
+        Backup Data
+        <div class="action-btn-sub">Save a backup file to restore later</div>
+      </div>
+    </div>
+    <div class="action-btn" id="restoreBtn">
+      <div class="action-btn-icon">📂</div>
+      <div class="action-btn-text">
+        Restore from Backup
+        <div class="action-btn-sub">Load a previously saved backup</div>
+      </div>
+    </div>
+    <input type="file" id="restoreInput" accept=".json" style="display:none">
+
+    <!-- Categories -->
+    <div class="sec-title" style="margin-bottom:8px;margin-top:4px">Categories</div>
+    <div class="card">
+      <div id="catManageList"></div>
+      <div class="add-cat-row">
+        <div class="color-swatch"><input type="color" id="newCatColor" value="#47c8ff"></div>
+        <input type="text" id="newCatName" placeholder="New category name…" maxlength="24" style="flex:1">
+        <button class="add-cat-btn" id="addCatBtn">Add</button>
+      </div>
+    </div>
+
+    <!-- Delete old -->
+    <div class="sec-title" style="margin-bottom:8px;margin-top:4px">Manage Entries</div>
+    <div class="action-btn danger" id="deleteOldBtn">
+      <div class="action-btn-icon">🗑</div>
+      <div class="action-btn-text">
+        Delete Old Entries
+        <div class="action-btn-sub">Remove entries older than 30, 60, or 90 days</div>
+      </div>
+    </div>
+    <div class="action-btn danger" id="deleteAllBtn">
+      <div class="action-btn-icon">⚠️</div>
+      <div class="action-btn-text">
+        Delete ALL Entries
+        <div class="action-btn-sub">Permanently wipe all data</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /pages -->
+
+<!-- ENTRY MODAL -->
+<div class="overlay" id="entryOverlay">
+  <div class="modal">
+    <div class="modal-title" id="entryModalTitle">Add Entry</div>
+    <div class="field"><label class="field-label">Date</label><input type="date" id="mDate"></div>
+    <div class="field"><label class="field-label">Start Time</label><input type="time" id="mStart"></div>
+    <div class="field"><label class="field-label">End Time</label><input type="time" id="mEnd"></div>
+    <div class="field"><label class="field-label">Category</label><div class="tag-row" id="modalTagRow"></div></div>
+    <div class="field"><label class="field-label">Note</label><textarea id="mNote" rows="3" placeholder="Optional note…"></textarea></div>
+    <div class="modal-actions">
+      <div class="btn-cancel" id="entryCancelBtn">Cancel</div>
+      <div class="btn-save" id="entrySaveBtn">Save</div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── DATA ─────────────────────────────────────────────────
+const STORE = 'timecard_v1'
+const DEFAULT_CATS = [
+  {id:'dev',label:'Dev',color:'#47c8ff'},
+  {id:'meetings',label:'Meetings',color:'#c47fff'},
+  {id:'design',label:'Design',color:'#ff8c47'},
+  {id:'admin',label:'Admin',color:'#ffb347'},
+  {id:'research',label:'Research',color:'#47ffb2'},
+  {id:'other',label:'Other',color:'#888888'}
+]
+
+let S = { entries:[], cats:JSON.parse(JSON.stringify(DEFAULT_CATS)), clockedIn:null, dark:true, selTag:'' }
+
+function loadData() {
+  try { const r = localStorage.getItem(STORE); if(r) Object.assign(S, JSON.parse(r)) } catch(e){}
+}
+function saveData() {
+  localStorage.setItem(STORE, JSON.stringify({entries:S.entries, cats:S.cats, clockedIn:S.clockedIn, dark:S.dark}))
+}
+
+// ── UTILS ─────────────────────────────────────────────────
+const pad = n => String(n).padStart(2,'0')
+const todayStr = () => { const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}` }
+const nowStr = () => { const d=new Date(); return `${pad(d.getHours())}:${pad(d.getMinutes())}` }
+const fmt12 = ts => { const [h,m]=ts.split(':').map(Number); return `${h%12||12}:${pad(m)} ${h<12?'AM':'PM'}` }
+const fmtDate = ds => new Date(ds+'T12:00:00').toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'})
+const parseLocal = (ds,ts) => new Date(`${ds}T${ts}:00`)
+const calcH = (d,s,e) => Math.max(0,(parseLocal(d,e)-parseLocal(d,s))/3600000)
+const fmtH = h => { const r=Math.floor(h),m=Math.round((h-r)*60); return r?(m?`${r}h ${m}m`:`${r}h`):`${m}m` }
+const genId = () => Date.now().toString(36)+Math.random().toString(36).slice(2,5)
+const getCat = id => S.cats.find(c=>c.id===id)||{label:'',color:'#888',id:''}
+const hexRgb = h => `${parseInt(h.slice(1,3),16)},${parseInt(h.slice(3,5),16)},${parseInt(h.slice(5,7),16)}`
+
+function weekStart() {
+  const n=new Date(); const ws=new Date(n)
+  ws.setDate(n.getDate()-((n.getDay()+6)%7)); ws.setHours(0,0,0,0); return ws
+}
+
+// ── CLOCK ─────────────────────────────────────────────────
+let elapsedTimer
+
+function clockIn() {
+  S.clockedIn = { ts:Date.now(), start:nowStr(), date:todayStr(), tag:S.selTag, note:document.getElementById('noteInput').value.trim() }
+  saveData(); updateHero(); startElapsed(); renderDayBar(); showToast('Clocked in ✓')
+}
+
+function clockOut() {
+  const ci = S.clockedIn
+  const end = nowStr()
+  const note = document.getElementById('noteInput').value.trim() || ci.note
+  const entry = { id:genId(), date:ci.date, start:ci.start, end, tag:S.selTag||ci.tag, note }
+  S.entries.unshift(entry)
+  S.entries.sort((a,b)=>b.date.localeCompare(a.date)||b.start.localeCompare(a.start))
+  S.clockedIn = null
+  document.getElementById('noteInput').value = ''
+  S.selTag = ''
+  saveData(); stopElapsed(); updateHero(); renderDayBar()
+  renderTagRow('clockTagRow', S.selTag, t=>{ S.selTag=t; renderTagRow('clockTagRow',S.selTag,arguments.callee) })
+  renderTodayList(); showToast('Clocked out ✓')
+}
+
+function startElapsed() {
+  clearInterval(elapsedTimer)
+  elapsedTimer = setInterval(()=>{
+    if(!S.clockedIn) return
+    const ms = Date.now()-S.clockedIn.ts
+    const h=Math.floor(ms/3600000),m=Math.floor((ms%3600000)/60000),s=Math.floor((ms%60000)/1000)
+    document.getElementById('elapsedDisplay').textContent = `${pad(h)}:${pad(m)}:${pad(s)}`
+  },1000)
+}
+function stopElapsed() { clearInterval(elapsedTimer); document.getElementById('elapsedDisplay').textContent='00:00:00' }
+
+function updateHero() {
+  const hero=document.getElementById('hero'), btn=document.getElementById('clockBtn')
+  if(S.clockedIn) {
+    hero.classList.add('clocked'); btn.classList.add('out')
+    document.getElementById('cbIcon').textContent='⏹'
+    document.getElementById('cbLabel').textContent='Clock Out'
+    const t=new Date(S.clockedIn.ts)
+    document.getElementById('sinceText').textContent=`Since ${fmt12(pad(t.getHours())+':'+pad(t.getMinutes()))}`
+  } else {
+    hero.classList.remove('clocked'); btn.classList.remove('out')
+    document.getElementById('cbIcon').textContent='▶'
+    document.getElementById('cbLabel').textContent='Clock In'
+  }
+}
+
+// ── DAY BAR ───────────────────────────────────────────────
+function renderDayBar() {
+  const today = todayStr()
+  const todayEntries = S.entries.filter(e=>e.date===today)
+  const todayH = todayEntries.reduce((a,e)=>a+calcH(e.date,e.start,e.end),0)
+  const ws = weekStart()
+  const weekH = S.entries.filter(e=>new Date(e.date+'T12:00:00')>=ws).reduce((a,e)=>a+calcH(e.date,e.start,e.end),0)
+
+  const dh = document.getElementById('dayHours')
+  dh.textContent = fmtH(todayH)
+  dh.className = 'day-bar-hours' + (todayH>=8?' overtime':'')
+  document.getElementById('dayEntries').textContent = todayEntries.length
+  const whs = document.getElementById('weekHoursSmall')
+  whs.textContent = fmtH(weekH)
+  whs.className = 'day-stat-val' + (weekH>=40?' overtime':'')
+}
+
+// ── TAG ROW ───────────────────────────────────────────────
+function renderTagRow(id, sel, fn) {
+  const row = document.getElementById(id); if(!row) return
+  row.innerHTML = ''
+  S.cats.forEach(cat=>{
+    const el=document.createElement('div'); el.className='chip'
+    el.textContent=cat.label
+    if(sel===cat.id) {
+      el.style.background=`rgba(${hexRgb(cat.color)},.18)`
+      el.style.borderColor=cat.color; el.style.color=cat.color
+    } else { el.style.color=cat.color }
+    el.addEventListener('click',()=>fn(sel===cat.id?'':cat.id))
+    row.appendChild(el)
+  })
+}
+
+// ── ENTRY CARD ────────────────────────────────────────────
+function makeEntryCard(entry) {
+  const h=calcH(entry.date,entry.start,entry.end)
+  const cat=getCat(entry.tag)
+  const ec=document.createElement('div'); ec.className='ec'
+  ec.style.setProperty('--ec-color', cat.color||'var(--accent)')
+  ec.innerHTML=`
+    <div class="ec-top">
+      <div class="ec-time">${fmt12(entry.start)} – ${fmt12(entry.end)}</div>
+      <div class="ec-dur">${fmtH(h)}</div>
+    </div>
+    ${entry.tag?`<div class="ec-tag" style="color:${cat.color};background:${cat.color}22">${cat.label}</div>`:''}
+    ${entry.note?`<div class="ec-note">${entry.note}</div>`:''}
+    <div class="ec-actions">
+      <div class="ec-btn edit-btn">✎ Edit</div>
+      <div class="ec-btn danger del-btn">✕ Delete</div>
+    </div>`
+  ec.querySelector('.edit-btn').addEventListener('click',()=>openEditModal(entry.id))
+  ec.querySelector('.del-btn').addEventListener('click',()=>deleteEntry(entry.id))
+  return ec
+}
+
+// ── TODAY LIST ────────────────────────────────────────────
+function renderTodayList() {
+  const today=todayStr()
+  const list=S.entries.filter(e=>e.date===today)
+  const el=document.getElementById('todayList'); el.innerHTML=''
+  if(!list.length) {
+    el.innerHTML='<div class="empty-state"><div class="empty-icon">📝</div><div class="empty-text">No entries today yet</div></div>'
+    document.getElementById('todayTotal').textContent=''
+    return
+  }
+  const tot=list.reduce((a,e)=>a+calcH(e.date,e.start,e.end),0)
+  document.getElementById('todayTotal').textContent=fmtH(tot)
+  list.forEach(e=>el.appendChild(makeEntryCard(e)))
+}
+
+// ── LOG LIST ──────────────────────────────────────────────
+function renderLog() {
+  const el=document.getElementById('logList'); el.innerHTML=''
+  if(!S.entries.length) {
+    el.innerHTML='<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">No entries yet</div></div>'
+    document.getElementById('logTotal').textContent=''; return
+  }
+  const byDate={}
+  S.entries.forEach(e=>{ if(!byDate[e.date]) byDate[e.date]=[]; byDate[e.date].push(e) })
+  let grand=0
+  Object.keys(byDate).sort((a,b)=>b.localeCompare(a)).forEach(date=>{
+    const dayH=byDate[date].reduce((a,e)=>a+calcH(e.date,e.start,e.end),0)
+    grand+=dayH
+    const hdr=document.createElement('div'); hdr.className='day-group-hdr'
+    hdr.innerHTML=`${fmtDate(date)}<span>${fmtH(dayH)}</span>`
+    el.appendChild(hdr)
+    const list=document.createElement('div'); list.className='entries-list'
+    byDate[date].forEach(e=>list.appendChild(makeEntryCard(e)))
+    el.appendChild(list)
+  })
+  document.getElementById('logTotal').textContent=`Total: ${fmtH(grand)}`
+}
+
+// ── STATS ─────────────────────────────────────────────────
+function renderStats() {
+  const today=todayStr(), ws=weekStart()
+  let todayH=0,weekH=0,allH=0
+  S.entries.forEach(e=>{
+    const h=calcH(e.date,e.start,e.end); allH+=h
+    if(e.date===today) todayH+=h
+    if(new Date(e.date+'T12:00:00')>=ws) weekH+=h
+  })
+
+  const sg=document.getElementById('statGrid')
+  sg.innerHTML=`
+    <div class="stat-card">
+      <div class="stat-label">Today</div>
+      <div class="stat-value accent ${todayH>=8?'warn':''}">${fmtH(todayH)}</div>
+      <div class="stat-sub">${S.entries.filter(e=>e.date===today).length} entries${todayH>=8?' · Overtime!':''}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">This Week</div>
+      <div class="stat-value accent ${weekH>=40?'warn':''}">${fmtH(weekH)}</div>
+      <div class="stat-sub">since Mon${weekH>=40?' · 40h+':''}</div>
+    </div>
+    <div class="stat-card full">
+      <div class="stat-label">All Time</div>
+      <div class="stat-value">${fmtH(allH)}</div>
+      <div class="stat-sub">${S.entries.length} total entries</div>
+    </div>`
+
+  // Week bar chart
+  const dn=['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+  const dH=new Array(7).fill(0)
+  S.entries.forEach(e=>{
+    const d=new Date(e.date+'T12:00:00')
+    if(d>=ws) dH[(d.getDay()+6)%7]+=calcH(e.date,e.start,e.end)
+  })
+  const mx=Math.max(...dH,1)
+  const wc=document.getElementById('weekChart'); wc.innerHTML=''
+  dH.forEach((h,i)=>{
+    const r=document.createElement('div'); r.className='bar-row'
+    const over=h>=8
+    r.innerHTML=`<div class="bar-day">${dn[i]}</div><div class="bar-track"><div class="bar-fill${over?' over':''}" style="width:${(h/mx)*100}%">${h>0?`<span class="bar-val">${fmtH(h)}</span>`:''}</div></div>`
+    wc.appendChild(r)
+  })
+
+  // Category breakdown
+  const ct={}
+  S.entries.forEach(e=>{ const h=calcH(e.date,e.start,e.end); ct[e.tag||'']=(ct[e.tag||'']||0)+h })
+  const ce=document.getElementById('catBreakdown'); ce.innerHTML=''
+  const sv=Object.entries(ct).sort((a,b)=>b[1]-a[1])
+  if(!sv.length) { ce.innerHTML='<div class="empty-state"><div class="empty-text" style="padding:16px">No entries yet</div></div>'; return }
+  sv.forEach(([id,h])=>{
+    const cat=id?getCat(id):{label:'Untagged',color:'#555'}
+    const r=document.createElement('div'); r.className='cat-row'
+    r.innerHTML=`<div class="cat-dot" style="background:${cat.color}"></div><div class="cat-name">${cat.label}</div><div class="cat-hrs">${fmtH(h)}</div>`
+    ce.appendChild(r)
+  })
+}
+
+// ── CATEGORIES MANAGER ────────────────────────────────────
+function renderCatManager() {
+  const el=document.getElementById('catManageList'); el.innerHTML=''
+  S.cats.forEach(cat=>{
+    const r=document.createElement('div'); r.className='cat-manage-row'
+    const sw=document.createElement('div'); sw.className='cat-swatch'; sw.style.background=cat.color
+    const nm=document.createElement('div'); nm.className='cat-manage-name'; nm.textContent=cat.label
+    const db=document.createElement('div'); db.className='cat-del'; db.textContent='✕'
+    sw.addEventListener('click',()=>{
+      const inp=document.createElement('input'); inp.type='color'; inp.value=cat.color
+      inp.style.cssText='position:fixed;opacity:0;pointer-events:none;'; document.body.appendChild(inp); inp.click()
+      inp.oninput=()=>{ const i=S.cats.findIndex(c=>c.id===cat.id); if(i!==-1){S.cats[i].color=inp.value;saveData();renderCatManager()} }
+      inp.onchange=()=>document.body.removeChild(inp)
+    })
+    db.addEventListener('click',()=>{
+      if(S.cats.length<=1){showToast('Need at least one category');return}
+      if(!confirm(`Delete "${cat.label}"?`)) return
+      S.cats=S.cats.filter(c=>c.id!==cat.id); saveData(); renderCatManager()
+      renderTagRow('clockTagRow',S.selTag,clockTagHandler); showToast('Deleted')
+    })
+    r.appendChild(sw); r.appendChild(nm); r.appendChild(db); el.appendChild(r)
+  })
+}
+
+// ── ENTRY MODAL ───────────────────────────────────────────
+let modalEntryId = null
+let modalTag = ''
+
+function openAddModal() {
+  modalEntryId=null; modalTag=''
+  document.getElementById('entryModalTitle').textContent='Add Entry'
+  document.getElementById('mDate').value=todayStr()
+  document.getElementById('mStart').value=''
+  document.getElementById('mEnd').value=''
+  document.getElementById('mNote').value=''
+  renderTagRow('modalTagRow',modalTag,t=>{ modalTag=t; renderTagRow('modalTagRow',modalTag,arguments.callee) })
+  document.getElementById('entryOverlay').classList.add('on')
+}
+
+function openEditModal(id) {
+  const e=S.entries.find(x=>x.id===id); if(!e) return
+  modalEntryId=id; modalTag=e.tag||''
+  document.getElementById('entryModalTitle').textContent='Edit Entry'
+  document.getElementById('mDate').value=e.date
+  document.getElementById('mStart').value=e.start
+  document.getElementById('mEnd').value=e.end
+  document.getElementById('mNote').value=e.note||''
+  renderTagRow('modalTagRow',modalTag,t=>{ modalTag=t; renderTagRow('modalTagRow',modalTag,arguments.callee) })
+  document.getElementById('entryOverlay').classList.add('on')
+}
+
+function closeModal() { document.getElementById('entryOverlay').classList.remove('on'); modalEntryId=null }
+
+function saveModal() {
+  const date=document.getElementById('mDate').value
+  const start=document.getElementById('mStart').value
+  const end=document.getElementById('mEnd').value
+  const note=document.getElementById('mNote').value.trim()
+  if(!date||!start||!end){showToast('Please fill in date and times');return}
+  if(start>=end){showToast('End time must be after start time');return}
+  if(modalEntryId) {
+    const i=S.entries.findIndex(e=>e.id===modalEntryId)
+    if(i!==-1) S.entries[i]={...S.entries[i],date,start,end,note,tag:modalTag}
+    showToast('Entry updated ✓')
+  } else {
+    S.entries.unshift({id:genId(),date,start,end,note,tag:modalTag})
+    showToast('Entry added ✓')
+  }
+  S.entries.sort((a,b)=>b.date.localeCompare(a.date)||b.start.localeCompare(a.start))
+  saveData(); closeModal(); renderTodayList(); renderDayBar()
+}
+
+function deleteEntry(id) {
+  if(!confirm('Delete this entry?')) return
+  S.entries=S.entries.filter(e=>e.id!==id)
+  saveData(); renderTodayList(); renderDayBar(); renderLog(); showToast('Deleted')
+}
+
+// ── EXPORT CSV ────────────────────────────────────────────
+function exportCSV() {
+  if(!S.entries.length){showToast('No entries to export');return}
+  const rows=[['Date','Day','Start','End','Hours','Category','Notes']]
+  S.entries.forEach(e=>{
+    const h=calcH(e.date,e.start,e.end).toFixed(2)
+    const day=new Date(e.date+'T12:00:00').toLocaleDateString([],{weekday:'long'})
+    rows.push([e.date,day,e.start,e.end,h,e.tag?getCat(e.tag).label:'',`"${(e.note||'').replace(/"/g,'""')}"`])
+  })
+  const csv=rows.map(r=>r.join(',')).join('\n')
+  const blob=new Blob([csv],{type:'text/csv'})
+  const url=URL.createObjectURL(blob)
+  const a=document.createElement('a'); a.href=url; a.download=`timecard_${todayStr()}.csv`
+  // iPhone Safari fallback — open in new tab if download doesn't trigger
+  a.target='_blank'; document.body.appendChild(a); a.click()
+  setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url)},200)
+  showToast('CSV exported ✓')
+}
+
+// ── BACKUP / RESTORE ──────────────────────────────────────
+function backupData() {
+  const backup={entries:S.entries,cats:S.cats,exportedAt:new Date().toISOString()}
+  const blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'})
+  const url=URL.createObjectURL(blob)
+  const a=document.createElement('a'); a.href=url; a.download=`timecard_backup_${todayStr()}.json`
+  a.target='_blank'; document.body.appendChild(a); a.click()
+  setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url)},200)
+  showToast('Backup saved ✓')
+}
+
+function restoreData(file) {
+  const reader=new FileReader()
+  reader.onload=e=>{
+    try {
+      const data=JSON.parse(e.target.result)
+      if(!data.entries||!Array.isArray(data.entries)) throw new Error('Invalid backup file')
+      if(!confirm(`Restore ${data.entries.length} entries? This will replace your current data.`)) return
+      S.entries=data.entries
+      if(data.cats) S.cats=data.cats
+      saveData(); renderTodayList(); renderDayBar(); renderCatManager()
+      showToast(`Restored ${data.entries.length} entries ✓`)
+    } catch(err) { showToast('Invalid backup file') }
+  }
+  reader.readAsText(file)
+}
+
+// ── DELETE OLD ────────────────────────────────────────────
+function deleteOld(days) {
+  const cutoff=new Date(); cutoff.setDate(cutoff.getDate()-days)
+  const before=S.entries.length
+  S.entries=S.entries.filter(e=>new Date(e.date+'T12:00:00')>=cutoff)
+  const deleted=before-S.entries.length
+  saveData(); renderTodayList(); renderDayBar(); renderLog()
+  showToast(`Deleted ${deleted} entr${deleted===1?'y':'ies'}`)
+}
+
+// ── TOAST ─────────────────────────────────────────────────
+let toastTimer
+function showToast(msg) {
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('on')
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('on'),2400)
+}
+
+// ── THEME ─────────────────────────────────────────────────
+function applyTheme() {
+  document.body.classList.toggle('light',!S.dark)
+  document.getElementById('themeBtn').textContent=S.dark?'☀':'☾'
+}
+
+// ── INIT ──────────────────────────────────────────────────
+loadData(); applyTheme()
+
+const clockTagHandler = t => { S.selTag=t; renderTagRow('clockTagRow',S.selTag,clockTagHandler) }
+renderTagRow('clockTagRow',S.selTag,clockTagHandler)
+
+if(S.clockedIn) {
+  updateHero(); startElapsed()
+  document.getElementById('noteInput').value=S.clockedIn.note||''
+  S.selTag=S.clockedIn.tag||''
+  renderTagRow('clockTagRow',S.selTag,clockTagHandler)
+}
+renderTodayList(); renderDayBar(); renderCatManager()
+
+// ── NAV ───────────────────────────────────────────────────
+document.querySelectorAll('.nt').forEach(tab=>{
+  tab.addEventListener('click',()=>{
+    document.querySelectorAll('.nt').forEach(t=>t.classList.remove('on'))
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'))
+    tab.classList.add('on')
+    document.getElementById('page-'+tab.dataset.tab).classList.add('on')
+    if(tab.dataset.tab==='log') renderLog()
+    if(tab.dataset.tab==='stats') renderStats()
+    if(tab.dataset.tab==='settings') renderCatManager()
+  })
+})
+
+// ── EVENTS ────────────────────────────────────────────────
+document.getElementById('clockBtn').addEventListener('click',()=>S.clockedIn?clockOut():clockIn())
+document.getElementById('themeBtn').addEventListener('click',()=>{S.dark=!S.dark;saveData();applyTheme()})
+document.getElementById('addManualBtn').addEventListener('click',openAddModal)
+document.getElementById('entryCancelBtn').addEventListener('click',closeModal)
+document.getElementById('entrySaveBtn').addEventListener('click',saveModal)
+document.getElementById('entryOverlay').addEventListener('click',e=>{ if(e.target===document.getElementById('entryOverlay')) closeModal() })
+document.getElementById('exportCsvBtn').addEventListener('click',exportCSV)
+document.getElementById('backupBtn').addEventListener('click',backupData)
+document.getElementById('restoreBtn').addEventListener('click',()=>document.getElementById('restoreInput').click())
+document.getElementById('restoreInput').addEventListener('change',e=>{ if(e.target.files[0]) restoreData(e.target.files[0]) })
+document.getElementById('addCatBtn').addEventListener('click',()=>{
+  const name=document.getElementById('newCatName').value.trim()
+  const color=document.getElementById('newCatColor').value
+  if(!name){showToast('Enter a category name');return}
+  S.cats.push({id:name.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')+'-'+genId().slice(0,4),label:name,color})
+  document.getElementById('newCatName').value=''; saveData(); renderCatManager()
+  renderTagRow('clockTagRow',S.selTag,clockTagHandler); showToast(`"${name}" added ✓`)
+})
+document.getElementById('deleteOldBtn').addEventListener('click',()=>{
+  const choice=prompt('Delete entries older than how many days?\nEnter 30, 60, or 90:')
+  const days=parseInt(choice)
+  if([30,60,90].includes(days)) deleteOld(days)
+  else if(choice!==null) showToast('Enter 30, 60, or 90')
+})
+document.getElementById('deleteAllBtn').addEventListener('click',()=>{
+  if(!confirm(`Delete ALL ${S.entries.length} entries? This cannot be undone.`)) return
+  S.entries=[]; saveData(); renderTodayList(); renderDayBar(); renderLog(); showToast('All entries deleted')
+})
+</script>
+</body>
+</html>
