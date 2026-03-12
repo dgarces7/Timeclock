@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -14,7 +15,7 @@
   --bg:#0d0d0d; --surface:#1c1c1c; --surface2:#252525; --surface3:#303030;
   --border:#2e2e2e; --border2:#3a3a3a; --text:#f2f2f2; --muted:#888;
   --faint:#484848; --accent:#d4ff4e; --accent-rgb:212,255,78;
-  --red:#ff5252; --orange:#ffaa44; --radius:14px; --radius-sm:9px;
+  --red:#ff5252; --radius:14px; --radius-sm:9px;
   --mono:'Space Mono',monospace; --sans:'DM Sans',sans-serif;
 }
 .light {
@@ -65,7 +66,6 @@ body{display:flex;flex-direction:column;max-width:430px;margin:0 auto;}
 .day-stat{text-align:center;}
 .day-stat-val{font-family:var(--mono);font-size:14px;font-weight:700;}
 .day-stat-lbl{font-size:9px;color:var(--faint);text-transform:uppercase;letter-spacing:.08em;}
-.overtime{color:var(--orange)!important;}
 
 /* CARD */
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:15px;}
@@ -107,13 +107,11 @@ textarea::placeholder,input::placeholder{color:var(--faint);}
 .stat-label{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin-bottom:4px;}
 .stat-value{font-family:var(--mono);font-size:26px;font-weight:700;}
 .stat-value.accent{color:var(--accent);}
-.stat-value.warn{color:var(--orange);}
 .stat-sub{font-size:11px;color:var(--muted);margin-top:3px;}
 .bar-row{display:flex;align-items:center;gap:9px;margin-bottom:6px;}
 .bar-day{font-size:10px;font-family:var(--mono);color:var(--muted);width:24px;text-align:right;flex-shrink:0;}
 .bar-track{flex:1;height:18px;background:var(--surface2);border-radius:4px;overflow:hidden;position:relative;}
 .bar-fill{height:100%;background:var(--accent);border-radius:4px;display:flex;align-items:center;padding-left:6px;min-width:0;transition:width .4s;}
-.bar-fill.over{background:var(--orange);}
 .bar-val{font-family:var(--mono);font-size:9px;color:#111;font-weight:700;white-space:nowrap;}
 .cat-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);}
 .cat-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
@@ -354,7 +352,11 @@ const nowStr = () => { const d=new Date(); return `${pad(d.getHours())}:${pad(d.
 const fmt12 = ts => { const [h,m]=ts.split(':').map(Number); return `${h%12||12}:${pad(m)} ${h<12?'AM':'PM'}` }
 const fmtDate = ds => new Date(ds+'T12:00:00').toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'})
 const parseLocal = (ds,ts) => new Date(`${ds}T${ts}:00`)
-const calcH = (d,s,e) => Math.max(0,(parseLocal(d,e)-parseLocal(d,s))/3600000)
+const calcH = (d,s,e) => {
+  let ms = parseLocal(d,e) - parseLocal(d,s)
+  if(ms < 0) ms += 86400000 // cross-midnight: add 24 hours
+  return Math.max(0, ms/3600000)
+}
 const fmtH = h => { const r=Math.floor(h),m=Math.round((h-r)*60); return r?(m?`${r}h ${m}m`:`${r}h`):`${m}m` }
 const genId = () => Date.now().toString(36)+Math.random().toString(36).slice(2,5)
 const getCat = id => S.cats.find(c=>c.id===id)||{label:'',color:'#888',id:''}
@@ -424,11 +426,11 @@ function renderDayBar() {
 
   const dh = document.getElementById('dayHours')
   dh.textContent = fmtH(todayH)
-  dh.className = 'day-bar-hours' + (todayH>=8?' overtime':'')
+  dh.className = 'day-bar-hours'
   document.getElementById('dayEntries').textContent = todayEntries.length
   const whs = document.getElementById('weekHoursSmall')
   whs.textContent = fmtH(weekH)
-  whs.className = 'day-stat-val' + (weekH>=40?' overtime':'')
+  whs.className = 'day-stat-val'
 }
 
 // ── TAG ROW ───────────────────────────────────────────────
@@ -521,13 +523,13 @@ function renderStats() {
   sg.innerHTML=`
     <div class="stat-card">
       <div class="stat-label">Today</div>
-      <div class="stat-value accent ${todayH>=8?'warn':''}">${fmtH(todayH)}</div>
-      <div class="stat-sub">${S.entries.filter(e=>e.date===today).length} entries${todayH>=8?' · Overtime!':''}</div>
+      <div class="stat-value accent">${fmtH(todayH)}</div>
+      <div class="stat-sub">${S.entries.filter(e=>e.date===today).length} entries</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">This Week</div>
-      <div class="stat-value accent ${weekH>=40?'warn':''}">${fmtH(weekH)}</div>
-      <div class="stat-sub">since Mon${weekH>=40?' · 40h+':''}</div>
+      <div class="stat-value accent">${fmtH(weekH)}</div>
+      <div class="stat-sub">since Mon</div>
     </div>
     <div class="stat-card full">
       <div class="stat-label">All Time</div>
@@ -546,8 +548,7 @@ function renderStats() {
   const wc=document.getElementById('weekChart'); wc.innerHTML=''
   dH.forEach((h,i)=>{
     const r=document.createElement('div'); r.className='bar-row'
-    const over=h>=8
-    r.innerHTML=`<div class="bar-day">${dn[i]}</div><div class="bar-track"><div class="bar-fill${over?' over':''}" style="width:${(h/mx)*100}%">${h>0?`<span class="bar-val">${fmtH(h)}</span>`:''}</div></div>`
+    r.innerHTML=`<div class="bar-day">${dn[i]}</div><div class="bar-track"><div class="bar-fill" style="width:${(h/mx)*100}%">${h>0?`<span class="bar-val">${fmtH(h)}</span>`:''}</div></div>`
     wc.appendChild(r)
   })
 
@@ -624,7 +625,7 @@ function saveModal() {
   const end=document.getElementById('mEnd').value
   const note=document.getElementById('mNote').value.trim()
   if(!date||!start||!end){showToast('Please fill in date and times');return}
-  if(start>=end){showToast('End time must be after start time');return}
+  // Allow cross-midnight (end < start means next day)
   if(modalEntryId) {
     const i=S.entries.findIndex(e=>e.id===modalEntryId)
     if(i!==-1) S.entries[i]={...S.entries[i],date,start,end,note,tag:modalTag}
