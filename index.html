@@ -462,14 +462,15 @@ function makeEntryCard(entry) {
   const cat=getCat(entry.tag)
   const ec=document.createElement('div'); ec.className='ec'
   ec.style.setProperty('--ec-color', cat.color||'var(--accent)')
-  const endDateLabel = entry.endDate && entry.endDate!==entry.date ? ` <span style="color:var(--muted);font-size:10px">(next day)</span>` : ''
+  const isCont = entry.continuation
   ec.innerHTML=`
     <div class="ec-top">
-      <div class="ec-time">${fmt12(entry.start)} – ${fmt12(entry.end)}${endDateLabel}</div>
+      <div class="ec-time">${isCont?'<span style="color:var(--muted);margin-right:4px">↪</span>':''}${fmt12(entry.start)} – ${fmt12(entry.end)}</div>
       <div class="ec-dur">${fmtH(h)}</div>
     </div>
     ${entry.tag?`<div class="ec-tag" style="color:${cat.color};background:${cat.color}22">${cat.label}</div>`:''}
-    ${entry.note?`<div class="ec-note">${entry.note}</div>`:''}
+    ${entry.note&&!isCont?`<div class="ec-note">${entry.note}</div>`:''}
+    ${isCont&&entry.note&&entry.note!=='↪ (continued)'?`<div class="ec-note" style="color:var(--muted)">${entry.note}</div>`:''}
     <div class="ec-actions">
       <div class="ec-btn edit-btn">✎ Edit</div>
       <div class="ec-btn danger del-btn">✕ Delete</div>
@@ -630,12 +631,17 @@ function openAddModal() {
 
 function openEditModal(id) {
   const e=S.entries.find(x=>x.id===id); if(!e) return
+  if(e.continuation) {
+    showToast('Edit the original entry to change both parts')
+    return
+  }
   modalEntryId=id; modalTag=e.tag||''
   document.getElementById('entryModalTitle').textContent='Edit Entry'
   document.getElementById('mStartDate').value=e.date
-  document.getElementById('mEndDate').value=e.endDate||e.date
+  // If this is the first half of a split, show the real end date/time of the full span
+  document.getElementById('mEndDate').value=e.fullEndDate||e.endDate||e.date
   document.getElementById('mStart').value=e.start
-  document.getElementById('mEnd').value=e.end
+  document.getElementById('mEnd').value=e.fullEnd||e.end
   document.getElementById('mNote').value=e.note||''
   updateDurationPreview()
   renderTagRow('modalTagRow',modalTag,t=>{ modalTag=t; renderTagRow('modalTagRow',modalTag,arguments.callee) })
@@ -643,6 +649,20 @@ function openEditModal(id) {
 }
 
 function closeModal() { document.getElementById('entryOverlay').classList.remove('on'); modalEntryId=null }
+
+// Split a cross-midnight entry into 2 entries, returns array of 1 or 2 entry objects
+function splitEntry(startDate, start, end, endDate, note, tag, baseId) {
+  const id1 = baseId||genId()
+  if(!endDate || endDate === startDate) {
+    return [{id:id1, date:startDate, endDate:startDate, start, end, note, tag}]
+  }
+  const id2 = genId()
+  return [
+    // Entry 1: stores fullEndDate/fullEnd so edit modal can reconstruct the full span
+    {id:id1, date:startDate, endDate:startDate, start, end:'23:59', note, tag, pairedId:id2, fullEndDate:endDate, fullEnd:end},
+    {id:id2, date:endDate, endDate:endDate, start:'00:00', end, note, tag, continuation:true, pairedId:id1}
+  ]
+}
 
 function saveModal() {
   const startDate=document.getElementById('mStartDate').value
@@ -653,13 +673,22 @@ function saveModal() {
   if(!startDate||!endDate||!start||!end){showToast('Please fill in all date and time fields');return}
   const h=calcH(startDate,start,end,endDate)
   if(h<=0){showToast('End must be after start');return}
+
   if(modalEntryId) {
-    const i=S.entries.findIndex(e=>e.id===modalEntryId)
-    if(i!==-1) S.entries[i]={...S.entries[i],date:startDate,endDate,start,end,note,tag:modalTag}
-    showToast('Entry updated ✓')
+    // Find the old entry and its paired continuation (if any) by pairedId
+    const old=S.entries.find(e=>e.id===modalEntryId)
+    const pairedId=old?old.pairedId:null
+    // Remove original + its pair — keep everything EXCEPT those two ids
+    const removeIds=new Set([modalEntryId])
+    if(pairedId) removeIds.add(pairedId)
+    S.entries=S.entries.filter(e=>!removeIds.has(e.id))
+    const newEntries=splitEntry(startDate,start,end,endDate,note,modalTag,modalEntryId)
+    S.entries.push(...newEntries)
+    showToast(newEntries.length>1 ? 'Both entries updated ✓' : 'Entry updated ✓')
   } else {
-    S.entries.unshift({id:genId(),date:startDate,endDate,start,end,note,tag:modalTag})
-    showToast('Entry added ✓')
+    const newEntries=splitEntry(startDate,start,end,endDate,note,modalTag)
+    S.entries.push(...newEntries)
+    showToast(newEntries.length>1 ? 'Saved as 2 entries (cross-midnight) ✓' : 'Entry added ✓')
   }
   S.entries.sort((a,b)=>b.date.localeCompare(a.date)||b.start.localeCompare(a.start))
   saveData(); closeModal(); renderTodayList(); renderDayBar()
@@ -676,15 +705,16 @@ function exportCSV() {
   if(!S.entries.length){showToast('No entries to export');return}
   const rows=[['Date','Day','Start','End','Hours','Category','Notes']]
   S.entries.forEach(e=>{
-    const h=calcH(e.date,e.start,e.end).toFixed(2)
+    const h=calcH(e.date,e.start,e.end,e.endDate).toFixed(2)
     const day=new Date(e.date+'T12:00:00').toLocaleDateString([],{weekday:'long'})
-    rows.push([e.date,day,e.start,e.end,h,e.tag?getCat(e.tag).label:'',`"${(e.note||'').replace(/"/g,'""')}"`])
+    // Clean note: strip ↪ prefix from continuation entries, use original note
+    const cleanNote=(e.note||'').replace(/^↪\s*/,'')
+    rows.push([e.date,day,e.start,e.end,h,e.tag?getCat(e.tag).label:'',`"${cleanNote.replace(/"/g,'""')}"`])
   })
   const csv=rows.map(r=>r.join(',')).join('\n')
   const blob=new Blob([csv],{type:'text/csv'})
   const url=URL.createObjectURL(blob)
   const a=document.createElement('a'); a.href=url; a.download=`timecard_${todayStr()}.csv`
-  // iPhone Safari fallback — open in new tab if download doesn't trigger
   a.target='_blank'; document.body.appendChild(a); a.click()
   setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url)},200)
   showToast('CSV exported ✓')
