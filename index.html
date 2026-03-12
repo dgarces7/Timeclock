@@ -310,11 +310,17 @@ textarea::placeholder,input::placeholder{color:var(--faint);}
 <div class="overlay" id="entryOverlay">
   <div class="modal">
     <div class="modal-title" id="entryModalTitle">Add Entry</div>
-    <div class="field"><label class="field-label">Date</label><input type="date" id="mDate"></div>
-    <div class="field"><label class="field-label">Start Time</label><input type="time" id="mStart"></div>
-    <div class="field"><label class="field-label">End Time</label><input type="time" id="mEnd"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div class="field"><label class="field-label">Start Date</label><input type="date" id="mStartDate"></div>
+      <div class="field"><label class="field-label">Start Time</label><input type="time" id="mStart"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div class="field"><label class="field-label">End Date</label><input type="date" id="mEndDate"></div>
+      <div class="field"><label class="field-label">End Time</label><input type="time" id="mEnd"></div>
+    </div>
+    <div class="field" id="durationPreview" style="font-family:var(--mono);font-size:12px;color:var(--accent);padding:4px 0;display:none"></div>
     <div class="field"><label class="field-label">Category</label><div class="tag-row" id="modalTagRow"></div></div>
-    <div class="field"><label class="field-label">Note</label><textarea id="mNote" rows="3" placeholder="Optional note…"></textarea></div>
+    <div class="field"><label class="field-label">Note</label><textarea id="mNote" rows="2" placeholder="Optional note…"></textarea></div>
     <div class="modal-actions">
       <div class="btn-cancel" id="entryCancelBtn">Cancel</div>
       <div class="btn-save" id="entrySaveBtn">Save</div>
@@ -352,9 +358,10 @@ const nowStr = () => { const d=new Date(); return `${pad(d.getHours())}:${pad(d.
 const fmt12 = ts => { const [h,m]=ts.split(':').map(Number); return `${h%12||12}:${pad(m)} ${h<12?'AM':'PM'}` }
 const fmtDate = ds => new Date(ds+'T12:00:00').toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'})
 const parseLocal = (ds,ts) => new Date(`${ds}T${ts}:00`)
-const calcH = (d,s,e) => {
-  let ms = parseLocal(d,e) - parseLocal(d,s)
-  if(ms < 0) ms += 86400000 // cross-midnight: add 24 hours
+const calcH = (startDate, startTime, endTime, endDate) => {
+  const ed = endDate || startDate
+  let ms = parseLocal(ed, endTime) - parseLocal(startDate, startTime)
+  if(ms < 0) ms += 86400000 // fallback for legacy entries without endDate
   return Math.max(0, ms/3600000)
 }
 const fmtH = h => { const r=Math.floor(h),m=Math.round((h-r)*60); return r?(m?`${r}h ${m}m`:`${r}h`):`${m}m` }
@@ -422,7 +429,7 @@ function renderDayBar() {
   const todayEntries = S.entries.filter(e=>e.date===today)
   const todayH = todayEntries.reduce((a,e)=>a+calcH(e.date,e.start,e.end),0)
   const ws = weekStart()
-  const weekH = S.entries.filter(e=>new Date(e.date+'T12:00:00')>=ws).reduce((a,e)=>a+calcH(e.date,e.start,e.end),0)
+  const weekH = S.entries.filter(e=>new Date(e.date+'T12:00:00')>=ws).reduce((a,e)=>a+calcH(e.date,e.start,e.end,e.endDate),0)
 
   const dh = document.getElementById('dayHours')
   dh.textContent = fmtH(todayH)
@@ -451,13 +458,14 @@ function renderTagRow(id, sel, fn) {
 
 // ── ENTRY CARD ────────────────────────────────────────────
 function makeEntryCard(entry) {
-  const h=calcH(entry.date,entry.start,entry.end)
+  const h=calcH(entry.date,entry.start,entry.end,entry.endDate)
   const cat=getCat(entry.tag)
   const ec=document.createElement('div'); ec.className='ec'
   ec.style.setProperty('--ec-color', cat.color||'var(--accent)')
+  const endDateLabel = entry.endDate && entry.endDate!==entry.date ? ` <span style="color:var(--muted);font-size:10px">(next day)</span>` : ''
   ec.innerHTML=`
     <div class="ec-top">
-      <div class="ec-time">${fmt12(entry.start)} – ${fmt12(entry.end)}</div>
+      <div class="ec-time">${fmt12(entry.start)} – ${fmt12(entry.end)}${endDateLabel}</div>
       <div class="ec-dur">${fmtH(h)}</div>
     </div>
     ${entry.tag?`<div class="ec-tag" style="color:${cat.color};background:${cat.color}22">${cat.label}</div>`:''}
@@ -481,7 +489,7 @@ function renderTodayList() {
     document.getElementById('todayTotal').textContent=''
     return
   }
-  const tot=list.reduce((a,e)=>a+calcH(e.date,e.start,e.end),0)
+  const tot=list.reduce((a,e)=>a+calcH(e.date,e.start,e.end,e.endDate),0)
   document.getElementById('todayTotal').textContent=fmtH(tot)
   list.forEach(e=>el.appendChild(makeEntryCard(e)))
 }
@@ -497,7 +505,7 @@ function renderLog() {
   S.entries.forEach(e=>{ if(!byDate[e.date]) byDate[e.date]=[]; byDate[e.date].push(e) })
   let grand=0
   Object.keys(byDate).sort((a,b)=>b.localeCompare(a)).forEach(date=>{
-    const dayH=byDate[date].reduce((a,e)=>a+calcH(e.date,e.start,e.end),0)
+    const dayH=byDate[date].reduce((a,e)=>a+calcH(e.date,e.start,e.end,e.endDate),0)
     grand+=dayH
     const hdr=document.createElement('div'); hdr.className='day-group-hdr'
     hdr.innerHTML=`${fmtDate(date)}<span>${fmtH(dayH)}</span>`
@@ -514,7 +522,7 @@ function renderStats() {
   const today=todayStr(), ws=weekStart()
   let todayH=0,weekH=0,allH=0
   S.entries.forEach(e=>{
-    const h=calcH(e.date,e.start,e.end); allH+=h
+    const h=calcH(e.date,e.start,e.end,e.endDate); allH+=h
     if(e.date===today) todayH+=h
     if(new Date(e.date+'T12:00:00')>=ws) weekH+=h
   })
@@ -542,7 +550,7 @@ function renderStats() {
   const dH=new Array(7).fill(0)
   S.entries.forEach(e=>{
     const d=new Date(e.date+'T12:00:00')
-    if(d>=ws) dH[(d.getDay()+6)%7]+=calcH(e.date,e.start,e.end)
+    if(d>=ws) dH[(d.getDay()+6)%7]+=calcH(e.date,e.start,e.end,e.endDate)
   })
   const mx=Math.max(...dH,1)
   const wc=document.getElementById('weekChart'); wc.innerHTML=''
@@ -554,7 +562,7 @@ function renderStats() {
 
   // Category breakdown
   const ct={}
-  S.entries.forEach(e=>{ const h=calcH(e.date,e.start,e.end); ct[e.tag||'']=(ct[e.tag||'']||0)+h })
+  S.entries.forEach(e=>{ const h=calcH(e.date,e.start,e.end,e.endDate); ct[e.tag||'']=(ct[e.tag||'']||0)+h })
   const ce=document.getElementById('catBreakdown'); ce.innerHTML=''
   const sv=Object.entries(ct).sort((a,b)=>b[1]-a[1])
   if(!sv.length) { ce.innerHTML='<div class="empty-state"><div class="empty-text" style="padding:16px">No entries yet</div></div>'; return }
@@ -594,13 +602,28 @@ function renderCatManager() {
 let modalEntryId = null
 let modalTag = ''
 
+function updateDurationPreview() {
+  const sd=document.getElementById('mStartDate').value
+  const st=document.getElementById('mStart').value
+  const ed=document.getElementById('mEndDate').value
+  const et=document.getElementById('mEnd').value
+  const prev=document.getElementById('durationPreview')
+  if(sd&&st&&ed&&et) {
+    const h=calcH(sd,st,et,ed)
+    if(h>0) { prev.textContent=`⏱ Duration: ${fmtH(h)}`; prev.style.display='block' }
+    else { prev.style.display='none' }
+  } else { prev.style.display='none' }
+}
+
 function openAddModal() {
   modalEntryId=null; modalTag=''
   document.getElementById('entryModalTitle').textContent='Add Entry'
-  document.getElementById('mDate').value=todayStr()
+  document.getElementById('mStartDate').value=todayStr()
+  document.getElementById('mEndDate').value=todayStr()
   document.getElementById('mStart').value=''
   document.getElementById('mEnd').value=''
   document.getElementById('mNote').value=''
+  document.getElementById('durationPreview').style.display='none'
   renderTagRow('modalTagRow',modalTag,t=>{ modalTag=t; renderTagRow('modalTagRow',modalTag,arguments.callee) })
   document.getElementById('entryOverlay').classList.add('on')
 }
@@ -609,10 +632,12 @@ function openEditModal(id) {
   const e=S.entries.find(x=>x.id===id); if(!e) return
   modalEntryId=id; modalTag=e.tag||''
   document.getElementById('entryModalTitle').textContent='Edit Entry'
-  document.getElementById('mDate').value=e.date
+  document.getElementById('mStartDate').value=e.date
+  document.getElementById('mEndDate').value=e.endDate||e.date
   document.getElementById('mStart').value=e.start
   document.getElementById('mEnd').value=e.end
   document.getElementById('mNote').value=e.note||''
+  updateDurationPreview()
   renderTagRow('modalTagRow',modalTag,t=>{ modalTag=t; renderTagRow('modalTagRow',modalTag,arguments.callee) })
   document.getElementById('entryOverlay').classList.add('on')
 }
@@ -620,18 +645,20 @@ function openEditModal(id) {
 function closeModal() { document.getElementById('entryOverlay').classList.remove('on'); modalEntryId=null }
 
 function saveModal() {
-  const date=document.getElementById('mDate').value
+  const startDate=document.getElementById('mStartDate').value
+  const endDate=document.getElementById('mEndDate').value
   const start=document.getElementById('mStart').value
   const end=document.getElementById('mEnd').value
   const note=document.getElementById('mNote').value.trim()
-  if(!date||!start||!end){showToast('Please fill in date and times');return}
-  // Allow cross-midnight (end < start means next day)
+  if(!startDate||!endDate||!start||!end){showToast('Please fill in all date and time fields');return}
+  const h=calcH(startDate,start,end,endDate)
+  if(h<=0){showToast('End must be after start');return}
   if(modalEntryId) {
     const i=S.entries.findIndex(e=>e.id===modalEntryId)
-    if(i!==-1) S.entries[i]={...S.entries[i],date,start,end,note,tag:modalTag}
+    if(i!==-1) S.entries[i]={...S.entries[i],date:startDate,endDate,start,end,note,tag:modalTag}
     showToast('Entry updated ✓')
   } else {
-    S.entries.unshift({id:genId(),date,start,end,note,tag:modalTag})
+    S.entries.unshift({id:genId(),date:startDate,endDate,start,end,note,tag:modalTag})
     showToast('Entry added ✓')
   }
   S.entries.sort((a,b)=>b.date.localeCompare(a.date)||b.start.localeCompare(a.start))
@@ -751,6 +778,27 @@ document.getElementById('exportCsvBtn').addEventListener('click',exportCSV)
 document.getElementById('backupBtn').addEventListener('click',backupData)
 document.getElementById('restoreBtn').addEventListener('click',()=>document.getElementById('restoreInput').click())
 document.getElementById('restoreInput').addEventListener('change',e=>{ if(e.target.files[0]) restoreData(e.target.files[0]) })
+
+// Auto-advance end date when end time is before start time
+function autoEndDate() {
+  const sd=document.getElementById('mStartDate').value
+  const st=document.getElementById('mStart').value
+  const et=document.getElementById('mEnd').value
+  const edField=document.getElementById('mEndDate')
+  if(sd&&st&&et&&et<st) {
+    // End time is earlier than start — advance end date by 1 day
+    const next=new Date(sd+'T12:00:00'); next.setDate(next.getDate()+1)
+    edField.value=next.toISOString().slice(0,10)
+  } else if(sd&&(!edField.value||edField.value<sd)) {
+    edField.value=sd
+  }
+  updateDurationPreview()
+}
+document.getElementById('mStartDate').addEventListener('change',()=>{ document.getElementById('mEndDate').value=document.getElementById('mStartDate').value; updateDurationPreview() })
+document.getElementById('mStart').addEventListener('change', autoEndDate)
+document.getElementById('mEnd').addEventListener('change', autoEndDate)
+document.getElementById('mEndDate').addEventListener('change', updateDurationPreview)
+
 document.getElementById('addCatBtn').addEventListener('click',()=>{
   const name=document.getElementById('newCatName').value.trim()
   const color=document.getElementById('newCatColor').value
