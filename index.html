@@ -243,8 +243,16 @@ textarea::placeholder,input::placeholder{color:var(--faint);}
       <div class="card" id="weekChart"></div>
     </div>
     <div>
-      <div class="sec-title" style="margin-bottom:10px">By Category</div>
+      <div class="sec-title" style="margin-bottom:10px">Last Week</div>
+      <div class="card" id="lastWeekChart"></div>
+    </div>
+    <div>
+      <div class="sec-title" style="margin-bottom:10px">This Week — By Category</div>
       <div class="card" id="catBreakdown" style="padding:0 15px"></div>
+    </div>
+    <div>
+      <div class="sec-title" style="margin-bottom:10px">Last Week — By Category</div>
+      <div class="card" id="catBreakdownLast" style="padding:0 15px"></div>
     </div>
   </div>
 
@@ -334,12 +342,13 @@ textarea::placeholder,input::placeholder{color:var(--faint);}
 // ── DATA ─────────────────────────────────────────────────
 const STORE = 'timecard_v1'
 const DEFAULT_CATS = [
-  {id:'dev',label:'Dev',color:'#47c8ff'},
-  {id:'meetings',label:'Meetings',color:'#c47fff'},
-  {id:'design',label:'Design',color:'#ff8c47'},
-  {id:'admin',label:'Admin',color:'#ffb347'},
-  {id:'research',label:'Research',color:'#47ffb2'},
-  {id:'other',label:'Other',color:'#888888'}
+  {id:'professional',label:'Professional',color:'#47c8ff'},
+  {id:'fitness',label:'Fitness',color:'#47ff8c'},
+  {id:'think-time',label:'Think Time',color:'#c47fff'},
+  {id:'social',label:'Social',color:'#ffd447'},
+  {id:'leisure',label:'Leisure',color:'#ff8c47'},
+  {id:'misc-break',label:'Misc Break',color:'#888888'},
+  {id:'sleep',label:'Sleep',color:'#3a5a8a'}
 ]
 
 let S = { entries:[], cats:JSON.parse(JSON.stringify(DEFAULT_CATS)), clockedIn:null, dark:true, selTag:'' }
@@ -520,14 +529,36 @@ function renderLog() {
 
 // ── STATS ─────────────────────────────────────────────────
 function renderStats() {
-  const today=todayStr(), ws=weekStart()
-  let todayH=0,weekH=0,allH=0
+  const today=todayStr()
+  const ws=weekStart()
+  const lws=new Date(ws); lws.setDate(lws.getDate()-7) // last week start
+  const lwe=new Date(ws); lwe.setDate(lwe.getDate()-1) // last week end
+
+  let todayH=0, thisWeekH=0, lastWeekH=0
+  const thisWeekDH=new Array(7).fill(0)
+  const lastWeekDH=new Array(7).fill(0)
+  const thisWeekCat={}, lastWeekCat={}
+
   S.entries.forEach(e=>{
-    const h=calcH(e.date,e.start,e.end,e.endDate); allH+=h
+    const h=calcH(e.date,e.start,e.end,e.endDate)
+    const d=new Date(e.date+'T12:00:00')
+    const tag=e.tag||''
     if(e.date===today) todayH+=h
-    if(new Date(e.date+'T12:00:00')>=ws) weekH+=h
+    if(d>=ws) {
+      thisWeekH+=h
+      thisWeekDH[(d.getDay()+6)%7]+=h
+      thisWeekCat[tag]=(thisWeekCat[tag]||0)+h
+    } else if(d>=lws && d<=lwe) {
+      lastWeekH+=h
+      lastWeekDH[(d.getDay()+6)%7]+=h
+      lastWeekCat[tag]=(lastWeekCat[tag]||0)+h
+    }
   })
 
+  // ── Summary cards ──
+  const diff=thisWeekH-lastWeekH
+  const diffStr=diff===0?'same as last week':`${diff>0?'↑':'↓'} ${fmtH(Math.abs(diff))} vs last week`
+  const diffColor=diff>0?'var(--accent)':diff<0?'#ff6b6b':'var(--muted)'
   const sg=document.getElementById('statGrid')
   sg.innerHTML=`
     <div class="stat-card">
@@ -537,42 +568,58 @@ function renderStats() {
     </div>
     <div class="stat-card">
       <div class="stat-label">This Week</div>
-      <div class="stat-value accent">${fmtH(weekH)}</div>
-      <div class="stat-sub">since Mon</div>
-    </div>
-    <div class="stat-card full">
-      <div class="stat-label">All Time</div>
-      <div class="stat-value">${fmtH(allH)}</div>
-      <div class="stat-sub">${S.entries.length} total entries</div>
+      <div class="stat-value accent">${fmtH(thisWeekH)}</div>
+      <div class="stat-sub" style="color:${diffColor}">${diffStr}</div>
     </div>`
 
-  // Week bar chart
+  // ── Bar chart helper ──
   const dn=['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
-  const dH=new Array(7).fill(0)
-  S.entries.forEach(e=>{
-    const d=new Date(e.date+'T12:00:00')
-    if(d>=ws) dH[(d.getDay()+6)%7]+=calcH(e.date,e.start,e.end,e.endDate)
-  })
-  const mx=Math.max(...dH,1)
-  const wc=document.getElementById('weekChart'); wc.innerHTML=''
-  dH.forEach((h,i)=>{
-    const r=document.createElement('div'); r.className='bar-row'
-    r.innerHTML=`<div class="bar-day">${dn[i]}</div><div class="bar-track"><div class="bar-fill" style="width:${(h/mx)*100}%">${h>0?`<span class="bar-val">${fmtH(h)}</span>`:''}</div></div>`
-    wc.appendChild(r)
-  })
+  function renderBarChart(elId, dH) {
+    const mx=Math.max(...dH,1)
+    const wc=document.getElementById(elId); wc.innerHTML=''
+    dH.forEach((h,i)=>{
+      const r=document.createElement('div'); r.className='bar-row'
+      r.innerHTML=`<div class="bar-day">${dn[i]}</div><div class="bar-track"><div class="bar-fill" style="width:${(h/mx)*100}%">${h>0?`<span class="bar-val">${fmtH(h)}</span>`:''}</div></div>`
+      wc.appendChild(r)
+    })
+  }
+  renderBarChart('weekChart', thisWeekDH)
+  renderBarChart('lastWeekChart', lastWeekDH)
 
-  // Category breakdown
-  const ct={}
-  S.entries.forEach(e=>{ const h=calcH(e.date,e.start,e.end,e.endDate); ct[e.tag||'']=(ct[e.tag||'']||0)+h })
-  const ce=document.getElementById('catBreakdown'); ce.innerHTML=''
-  const sv=Object.entries(ct).sort((a,b)=>b[1]-a[1])
-  if(!sv.length) { ce.innerHTML='<div class="empty-state"><div class="empty-text" style="padding:16px">No entries yet</div></div>'; return }
-  sv.forEach(([id,h])=>{
-    const cat=id?getCat(id):{label:'Untagged',color:'#555'}
-    const r=document.createElement('div'); r.className='cat-row'
-    r.innerHTML=`<div class="cat-dot" style="background:${cat.color}"></div><div class="cat-name">${cat.label}</div><div class="cat-hrs">${fmtH(h)}</div>`
-    ce.appendChild(r)
-  })
+  // ── Category breakdown helper with % ──
+  function renderCatBreakdown(elId, catData) {
+    const ce=document.getElementById(elId); ce.innerHTML=''
+    const total=Object.values(catData).reduce((a,b)=>a+b,0)
+    const sv=Object.entries(catData).sort((a,b)=>b[1]-a[1])
+    if(!sv.length) {
+      ce.innerHTML='<div style="padding:16px;color:var(--muted);font-size:13px;text-align:center">No entries</div>'
+      return
+    }
+    sv.forEach(([id,h])=>{
+      const cat=id?getCat(id):{label:'Untagged',color:'#555'}
+      const pct=total>0?Math.round((h/total)*100):0
+      const r=document.createElement('div')
+      r.className='cat-row'
+      r.style.cssText='flex-direction:column;align-items:stretch;gap:4px;padding:10px 0'
+      r.innerHTML=`
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="cat-dot" style="background:${cat.color}"></div>
+            <div class="cat-name">${cat.label}</div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <div style="color:var(--muted);font-size:12px;font-family:var(--mono)">${fmtH(h)}</div>
+            <div style="color:${cat.color};font-size:13px;font-family:var(--mono);font-weight:700;min-width:36px;text-align:right">${pct}%</div>
+          </div>
+        </div>
+        <div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:${cat.color};border-radius:2px;transition:width .4s ease"></div>
+        </div>`
+      ce.appendChild(r)
+    })
+  }
+  renderCatBreakdown('catBreakdown', thisWeekCat)
+  renderCatBreakdown('catBreakdownLast', lastWeekCat)
 }
 
 // ── CATEGORIES MANAGER ────────────────────────────────────
